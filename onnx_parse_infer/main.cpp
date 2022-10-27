@@ -1,3 +1,4 @@
+////////////////////////////////////////////////////////////////////////////////////////////////////
 #include <vector>
 #include <string>
 #include <map>
@@ -20,14 +21,15 @@ public:
 
 class Tensor : std::enable_shared_from_this<Tensor> {
 public:
-	Tensor(const std::string& name, const std::shared_ptr<BaseNode>& parent = nullptr) :
+	Tensor(const std::string& name, BaseNode* parent = nullptr) :
 		name_(name),
 		value_(0.f)
 	{
 		parent_ = parent;
 	}
 
-	~Tensor() {}
+	~Tensor() {
+	}
 
 
 	void update() {
@@ -39,7 +41,7 @@ public:
 public:
 	std::string name_;
 	float value_;
-	std::shared_ptr<BaseNode> parent_;  // 父类指针
+	BaseNode* parent_;  // 父类指针
 };
 
 class Node : public BaseNode, std::enable_shared_from_this<Node> {
@@ -71,20 +73,26 @@ public:
 	std::string name_{ "" };
 	std::string op_type_{ "" };
 	bool is_computed_{ false };
-	std::vector<std::shared_ptr<Tensor>> input_;
-	std::shared_ptr<Tensor> output_{ nullptr };
+	std::vector<Tensor*> input_;
+	Tensor* output_{ nullptr };
 };
 
 class SparseConvolution : public Node {
 public:
-	SparseConvolution(const std::string& name, const std::shared_ptr<Tensor>& x, const std::string& attr) : Node(name, "SparseConvolution") {
+	SparseConvolution(const std::string& name, Tensor* x, const std::string& attr) : Node(name, "SparseConvolution") {
 		attributes_ = attr;
 		this->input_.push_back(x);
 		std::string n = name + ".ouput";
-		auto parent = std::shared_ptr<BaseNode>(dynamic_cast<BaseNode*>(this));
-		this->output_ = std::shared_ptr<Tensor>(new Tensor(n, parent));
+		auto parent = dynamic_cast<BaseNode*>(this);
+		this->output_ = new Tensor(n, parent);
 	}
-	~SparseConvolution() {}
+	~SparseConvolution() {
+		if (this->output_)
+		{
+			delete output_;
+			output_ = nullptr;
+		}
+	}
 
 
 	void forward() override {
@@ -98,14 +106,20 @@ private:
 
 class ReLU : public Node {
 public:
-	ReLU(const std::string& name, const std::shared_ptr<Tensor>& x) :
+	ReLU(const std::string& name, Tensor* x) :
 		Node(name, "ReLU") {
 		this->input_.push_back(x);
 		std::string n = name + ".ouput";
-		auto parent = std::shared_ptr<BaseNode>(dynamic_cast<BaseNode*>(this));
-		this->output_ = std::shared_ptr<Tensor>(new Tensor(n, parent));
+		auto parent = dynamic_cast<BaseNode*>(this);
+		this->output_ = new Tensor(n, parent);
 	}
-	~ReLU() {}
+	~ReLU() {
+		if (this->output_)
+		{
+			delete output_;
+			output_ = nullptr;
+		}
+	}
 
 
 	void forward() override {
@@ -116,15 +130,21 @@ public:
 
 class Add : public Node {
 public:
-	Add(const std::string& name, const std::shared_ptr<Tensor>& a, const std::shared_ptr<Tensor>& b) :
+	Add(const std::string& name, Tensor* a, Tensor* b) :
 		Node(name, "Add") {
 		this->input_.push_back(a);
 		this->input_.push_back(b);
 		std::string n = name + ".ouput";
-		auto parent = std::shared_ptr<BaseNode>(dynamic_cast<BaseNode*>(this));
-		this->output_ = std::shared_ptr<Tensor>(new Tensor(n, parent));
+		auto parent = dynamic_cast<BaseNode*>(this);
+		this->output_ = new Tensor(n, parent);
 	}
-	~Add() {}
+	~Add() {
+		if (this->output_)
+		{
+			delete output_;
+			output_ = nullptr;
+		}
+	}
 
 
 	void forward() override {
@@ -135,15 +155,21 @@ public:
 
 class BatchNormalization : public Node {
 public:
-	BatchNormalization(const std::string& name, const std::shared_ptr<Tensor>& x, const std::string& attr) :
+	BatchNormalization(const std::string& name, Tensor* x, const std::string& attr) :
 		Node(name, "BatchNormalization") {
 		attributes_ = attr;
 		this->input_.push_back(x);
 		std::string n = name + ".ouput";
-		auto parent = std::shared_ptr<BaseNode>(dynamic_cast<BaseNode*>(this));
-		this->output_ = std::shared_ptr<Tensor>(new Tensor(n, parent));
+		auto parent = dynamic_cast<BaseNode*>(this);
+		this->output_ = new Tensor(n, parent);
 	}
-	~BatchNormalization() {}
+	~BatchNormalization() {
+		if (this->output_)
+		{
+			delete output_;
+			output_ = nullptr;
+		}
+	}
 
 
 	void forward() override {
@@ -158,39 +184,66 @@ private:
 class Engine {
 public:
 	Engine() {}
-	~Engine() {}
+	~Engine() {
+		// 析构
+		for (int i = 0; i < this->inputs_.size(); ++i)
+		{
+			if (this->inputs_[i])
+			{
+				delete this->inputs_[i];
+				this->inputs_[i] = nullptr;
+			}
+		}
+		for (int i = 0; i < this->outputs_.size(); ++i)
+		{
+			if (this->outputs_[i])
+			{
+				delete this->outputs_[i];
+				this->outputs_[i] = nullptr;
+			}
+		}
+		for (int i = 0; i < this->nodes_.size(); ++i)
+		{
+			if (this->nodes_[i])
+			{
+				delete this->nodes_[i];
+				this->nodes_[i] = nullptr;
+			}
+		}
 
-	std::shared_ptr<Tensor> add_input(const std::string& name)
+	}
+
+	Tensor* add_input(const std::string& name)
 	{
-		auto x = std::shared_ptr<Tensor>(new Tensor(name));
+		auto x = new Tensor(name);
 		this->inputs_.push_back(x);
 		return x;
 	}
-	std::shared_ptr<Tensor> mark_output(const std::shared_ptr<Tensor>& x) {
+	Tensor* mark_output(Tensor* x) {
 		this->outputs_.push_back(x);
 		return x;
 	}
 
-	std::shared_ptr<Node> add_spconv(const std::string& name, const std::shared_ptr<Tensor>& x, std::string attributes = "") {
-		auto spc = std::shared_ptr<Node>(new SparseConvolution(name, x, attributes));
+	Node* add_spconv(const std::string& name, Tensor* x, std::string attributes = "") {
+		auto spc = new SparseConvolution(name, x, attributes);
 		this->nodes_.push_back(spc);
 		return spc;
 	}
 
-	std::shared_ptr<Node> add_relu(const std::string& name, const std::shared_ptr<Tensor>& x) {
-		auto relu = std::shared_ptr<Node>(new ReLU(name, x));
+	Node* add_relu(const std::string& name, Tensor* x) {
+		auto relu = new ReLU(name, x);
 		this->nodes_.push_back(relu);
 		return relu;
 	}
 
-	std::shared_ptr<Node> add_add(const std::string& name, const std::shared_ptr<Tensor>& a, const std::shared_ptr<Tensor>& b) {
-		auto add = std::shared_ptr<Node>(new Add(name, a, b));
+	Node* add_add(const std::string& name, Tensor* a, Tensor* b) {
+		auto add = new Add(name, a, b);
 		this->nodes_.push_back(add);
 		return add;
 	}
 
-	std::shared_ptr<Node> add_bn(const std::string& name, const std::shared_ptr<Tensor>& x, std::string attributes = "") {
-		auto bn = std::shared_ptr<Node>(new BatchNormalization(name, x, attributes));
+	Node* add_bn(const std::string& name, Tensor* x, std::string attributes = "") {
+		auto bn = new BatchNormalization(name, x, attributes);
 		this->nodes_.push_back(bn);
 		return bn;
 	}
@@ -207,49 +260,49 @@ public:
 	}
 
 private:
-	std::vector<std::shared_ptr<Tensor>> inputs_;
-	std::vector<std::shared_ptr<Tensor>> outputs_;
-	std::vector<std::shared_ptr<Node>> nodes_;
+	std::vector<Tensor*> inputs_;
+	std::vector<Tensor*> outputs_;
+	std::vector <Node*> nodes_;
 };
 
-Engine load_engine(const std::string& onnx_file) {
-	Engine engine;
+Engine* load_engine(const std::string& onnx_file) {
+	auto engine = new Engine();
 	onnx::ModelProto model;
 	std::ifstream in(onnx_file, std::ios_base::binary);
 	model.ParseFromIstream(&in);
 	in.close();
 	//std::cout << model.graph().input().size() << "\n";
 
-	std::map<std::string, std::shared_ptr<Tensor>> name_to_tensor;
+	std::map<std::string, Tensor*> name_to_tensor;
 	for (const auto& i : model.graph().input())
 	{
-		auto x = engine.add_input(i.name());
+		auto x = engine->add_input(i.name());
 		name_to_tensor[x->name_] = x;
 	}
 
 	for (const auto& n : model.graph().node())
 	{
 		if (n.op_type() == "SparseConvolution") {
-			auto layer = engine.add_spconv(n.name(), name_to_tensor[n.input()[0]], "");
+			auto layer = engine->add_spconv(n.name(), name_to_tensor[n.input()[0]], "");
 			name_to_tensor[n.output()[0]] = layer->output_;
 		}
 		else if (n.op_type() == "BatchNormalization") {
-			auto layer = engine.add_bn(n.name(), name_to_tensor[n.input()[0]], "");
+			auto layer = engine->add_bn(n.name(), name_to_tensor[n.input()[0]], "");
 			name_to_tensor[n.output()[0]] = layer->output_;
 		}
 		else if (n.op_type() == "Relu") {
-			auto layer = engine.add_relu(n.name(), name_to_tensor[n.input()[0]]);
+			auto layer = engine->add_relu(n.name(), name_to_tensor[n.input()[0]]);
 			name_to_tensor[n.output()[0]] = layer->output_;
 		}
 		else if (n.op_type() == "Add") {
-			auto layer = engine.add_add(n.name(), name_to_tensor[n.input()[0]], name_to_tensor[n.input()[1]]);
+			auto layer = engine->add_add(n.name(), name_to_tensor[n.input()[0]], name_to_tensor[n.input()[1]]);
 			name_to_tensor[n.output()[0]] = layer->output_;
 		}
 	}
 
 	for (const auto& o : model.graph().output())
 	{
-		engine.mark_output(name_to_tensor[o.name()]);
+		engine->mark_output(name_to_tensor[o.name()]);
 	}
 
 	return engine;
@@ -258,7 +311,13 @@ Engine load_engine(const std::string& onnx_file) {
 int main() {
 
 	std::string onnx = R"(D:\LearningCodes\GithubRepo\shouxieAI\spconv-onnx\code\code\scn.onnx)";
-	auto engine = load_engine(onnx);
-	std::cout << "result = " << engine.forward(1.0) << std::endl;
+	auto engine = load_engine(onnx); 
+	unsigned int i = 0;
+	while (i < 10000)
+	{
+		++i;
+		std::cout << "result = " << engine->forward(1.0) << std::endl;
+	}
 
+	return 0;
 }
