@@ -20,3 +20,35 @@ python rename_onnx_model.py --model model.onnx --origin_names x y z --new_names 
 ```
 
 其中`origin_names`和`new_names`，前者表示原模型中各个命名（可指定多个），后者表示新命名，两个参数指定的命名个数需要相同
+
+## 3. onnx模型额外信息保存和解析
+
+- 读取extr信息
+
+    reference：[metadata_extractor.cpp](https://gist.github.com/tomdol/8dae97218a8a9e56cb12919dd3e026d4)
+
+- 将一些imagesize 字典等信息保存到onnx模型
+``` python
+# 添加meta信息
+import onnx
+
+model = onnx.load_model('/path/to/model.onnx')
+meta = model.metadata_props.add()
+meta.key = 'dictionary'
+meta.value = open('/path/to/ppocr_keys_v1.txt', 'r', -1, 'u8').read()
+
+meta = model.metadata_props.add()
+meta.key = 'shape'
+meta.value = '[3,48,320]'
+
+onnx.save_model(model, '/path/to/model.onnx')
+
+# 获取meta信息
+import json
+import onnxruntime as ort
+
+sess = ort.InferenceSession('/path/to/model.onnx')
+metamap = sess.get_modelmeta().custom_metadata_map
+chars = metamap['dictionary'].splitlines()
+input_shape = json.loads(metamap['shape'])
+```
