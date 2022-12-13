@@ -9,3 +9,9 @@
 
 ## model_en_de_crypt
 模型加密和解密
+
+## conv-quantization
+模型量化学习脚本
+
+## cuda
+cuda 相关代码
