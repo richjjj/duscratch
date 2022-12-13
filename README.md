@@ -5,7 +5,7 @@
 稀疏卷积 spc 导出为onnx模型，然后手写onnx parse 创建推理 engine
 
 ## 2. onnx_utils
-操作 onnx 模型的脚本
+操作 onnx 模型
 
 ## 3. model_en_de_crypt
 模型加密和解密
