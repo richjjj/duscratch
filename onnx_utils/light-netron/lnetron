@@ -1,0 +1,74 @@
+# -*- coding: utf-8 -*-
+''' Python Server entry point '''
+
+import argparse
+import sys
+import os
+
+from netron.server import start
+from netron.server import stop
+from netron.server import status
+from netron.server import wait
+from netron.server import serve
+from netron.server import __version__
+import onnx
+
+def remove_some_weight(model, keep_bytes=8):
+    for node in model.graph.node:
+        if node.op_type == "Constant":
+            if len(node.attribute[0].t.raw_data) > keep_bytes:
+                node.attribute[0].t.raw_data = node.attribute[0].t.raw_data[:keep_bytes]
+
+    for init in model.graph.initializer:
+        if len(init.raw_data) > keep_bytes:
+            init.raw_data = init.raw_data[:keep_bytes]
+
+def main():
+    ''' main entry point '''
+    parser = argparse.ArgumentParser(
+        description='Viewer for neural network, deep learning and machine learning models.')
+    parser.add_argument('file',
+        metavar='MODEL_FILE', help='model file to serve', nargs='?', default=None)
+    parser.add_argument('-b', '--browse', help='launch web browser', action='store_true')
+    parser.add_argument('-p', '--port', help='port to serve', type=int)
+    parser.add_argument('--host', metavar='ADDR', help='host to serve', default='localhost')
+    parser.add_argument('--verbosity',
+        metavar='LEVEL', help='output verbosity (quiet, default, debug)',
+        choices=[ 'quiet', 'default', 'debug', '0', '1', '2' ], default='default')
+    parser.add_argument('--version', help="print version", action='store_true')
+    parser.add_argument('--nolight', action="store_true", help="remove some weight from onnx")
+    parser.add_argument('--keep-bytes', type=int, default=256, help="remove some weight from onnx, but keep top n bytes")
+    parser.add_argument('--save', type=str, help="remove some weight from onnx, but save result to the file")
+    parser.add_argument('--only-save', action="store_true", help="save result and exit")
+    args = parser.parse_args()
+    if args.file and not os.path.exists(args.file):
+        print("Model file '" + args.file + "' does not exist.")
+        sys.exit(2)
+    if args.version:
+        print(__version__)
+        sys.exit(0)
+    address = (args.host, args.port) if args.host else args.port if args.port else None
+
+    if not args.nolight:
+        ori_size = os.path.getsize(args.file)
+        model = onnx.load(args.file)
+        remove_some_weight(model, args.keep_bytes)
+        model_data = onnx._serialize(model)
+
+        if args.save:
+            with open(args.save, "wb") as f:
+                f.write(model_data)
+            print(f"Save result to {args.save}")
+
+        print(f"Serving lightweight mode. original length {ori_size/1024/1024:.2f} MB, lightweight length {len(model_data)/1024:.2f} KB")
+        if args.only_save:
+            sys.exit(0)
+
+        serve(args.file, model_data, browse=args.browse, address=address, verbosity=args.verbosity)
+    else:
+        start(args.file, address=address, browse=args.browse, verbosity=args.verbosity)
+    wait()
+    sys.exit(0)
+
+if __name__ == '__main__':
+    main()
