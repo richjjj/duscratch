@@ -22,5 +22,5 @@ cuda 相关代码
 ## 7. 小面筋
 [发散性问题](./questions.md)
 
-## DCT
+## 8. DCT
 DCT和DFT
