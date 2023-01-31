@@ -2,7 +2,7 @@
 
 1. gather、scatther、bucketize、searchsorted
 2. 迭代器、装饰器、生成器，迭代器与可迭代对象
-3. 凯明初始化tranning
+3. 凯明初始化training
 4. Makefile 相关，比如$@
 5. PTQ量化方法、校准方法；per channel quantization 的元素？
 6. 怎么理解cuda中的默认流，cudaStreamCreateWithFlag指定nonBlock flags 的作用？
